@@ -19,7 +19,7 @@ services:
       - app-network  
 
   backend:
-    image: chimuanyavic7/password-backend:v1 .
+    image: chimuanyavic7/password-backend:v1 
     restart: unless-stopped
     env_file:
       - .env
@@ -37,7 +37,7 @@ services:
       - app-network  
 
   frontend:
-    image:  chimuanyavic7/password-frontend:v1 .
+    image:  chimuanyavic7/password-frontend:v1 
     restart: unless-stopped
     ports:
       - "80:80"
