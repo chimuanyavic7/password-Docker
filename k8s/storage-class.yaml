@@ -7,3 +7,5 @@ parameters:
   type: gp2
 volumeBindingMode: WaitForFirstConsumer    # Use "WaitForFirstConsumer" if using dynamic provisioning  Immediate
 reclaimPolicy: Delete
+
+##
