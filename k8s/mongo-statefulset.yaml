@@ -2,7 +2,7 @@ kind: StatefulSet
 apiVersion: apps/v1
 metadata:
   name: mongo-statefulset
-  namespace: project3
+  namespace: password
 spec:
   serviceName: mongo
   replicas: 2
