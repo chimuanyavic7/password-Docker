@@ -4,8 +4,8 @@ on:
       - cicd
 
 env: 
-  APP_NAME: rating-app
-  NAMESPACE: project4
+  APP_NAME: password
+  NAMESPACE: password
 
 jobs:
   build-and-push:
