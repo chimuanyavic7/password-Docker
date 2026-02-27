@@ -45,9 +45,9 @@ jobs:
       # 4️⃣ Build Docker Image
       - name: Build Docker Image
         run: |
-          docker build -t ${{ secrets.DOCKER_USERNAME }}/react-app:$VERSION .
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/password-frontend:$VERSION .
 
       # 5️⃣ Push Docker Image
       - name: Push Docker Image
         run: |
-          docker push ${{ secrets.DOCKER_USERNAME }}/react-app:$VERSION
+          docker push ${{ secrets.DOCKER_USERNAME }}/password-frontend:$VERSION
