@@ -1,81 +1,44 @@
-name: CI/CD - EKS Deployment
+name: Build and Push Docker Image
 
 on:
   push:
+    # Trigger workflow on pushes to main or when Git tags are pushed
     branches:
-      - cicd
-
-env:
-  DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-  FRONTEND_IMAGE: password-frontend
-  BACKEND_IMAGE: password-backend
-  CLUSTER_NAME: my-cluster
-  AWS_REGION: eu-west-2
-  NAMESPACE: password
+      - main
+    tags:
+      - 'v*.*'  # Matches semantic version tags like v1.0, v2.1, etc.
 
 jobs:
-  build-and-push:
+  build:
     runs-on: ubuntu-latest
-    outputs:
-      tag: ${{ steps.tag.outputs.NEW_TAG }}
 
     steps:
-      - uses: actions/checkout@v4
+      # 1️⃣ Checkout code
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Generate Version Tag
-        id: tag
-        run: |
-          NEW_TAG=v${{ github.run_number }}
-          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_OUTPUT
-
-      - name: Docker Login
-        run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-
-      - name: Build & Push Frontend
-        run: |
-          docker build -t $DOCKERHUB_USERNAME/$FRONTEND_IMAGE:${{ steps.tag.outputs.NEW_TAG }} ./frontend
-          docker push $DOCKERHUB_USERNAME/$FRONTEND_IMAGE:${{ steps.tag.outputs.NEW_TAG }}
-
-      - name: Build & Push Backend
-        run: |
-          docker build -t $DOCKERHUB_USERNAME/$BACKEND_IMAGE:${{ steps.tag.outputs.NEW_TAG }} ./backend
-          docker push $DOCKERHUB_USERNAME/$BACKEND_IMAGE:${{ steps.tag.outputs.NEW_TAG }}
-
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build-and-push
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: aws-actions/configure-aws-credentials@v2
+      # 2️⃣ Login to Docker Hub
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Configure kubeconfig
-        run: |
-          aws eks update-kubeconfig --region $AWS_REGION --name $CLUSTER_NAME
+      # 3️⃣ Extract Docker metadata (semantic version tags)
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/react-app
+          tags: |
+            type=ref,name=tag   # Uses Git tags like v1.0, v1.1
+            type=raw,value=latest # Optional: always tag latest
 
-      - name: Deploy Kubernetes Resources
-        run: |
-          kubectl apply -f k8s/namespace.yaml
-          kubectl apply -f k8s/sc.yaml
-          kubectl apply -f k8s/headless.yaml
-          kubectl apply -f k8s/mongo-statefulset.yaml
-          kubectl apply -f k8s/job.yaml
-          kubectl apply -f k8s/backend-deployment.yaml
-          kubectl apply -f k8s/backend-service.yaml
-          kubectl apply -f k8s/frontend-deployment.yaml
-          kubectl apply -f k8s/frontend-service.yaml
-          kubectl apply -f k8s/ingress.yaml
+      # 4️⃣ Build and Push Docker Image
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
 
-      - name: Update Images (Rolling Update)
-        run: |
-          kubectl set image deployment/frontend frontend=$DOCKERHUB_USERNAME/$FRONTEND_IMAGE:${{ needs.build-and-push.outputs.tag }} -n $NAMESPACE
-          kubectl set image deployment/backend backend=$DOCKERHUB_USERNAME/$BACKEND_IMAGE:${{ needs.build-and-push.outputs.tag }} -n $NAMESPACE
-
-      - name: Verify
-        run: kubectl get all -n $NAMESPACE
