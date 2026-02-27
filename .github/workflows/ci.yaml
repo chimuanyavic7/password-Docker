@@ -2,11 +2,15 @@ name: Build and Push Docker Image
 
 on:
   push:
-    # Trigger workflow on pushes to main or when Git tags are pushed
     branches:
-      - main
+      - main   # triggers automatically on changes to main
     tags:
-      - 'v*.*'  # Matches semantic version tags like v1.0, v2.1, etc.
+      - 'v*.*' # triggers automatically if you push a version tag
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Docker image version (optional, e.g., v1.0)'
+        required: false
 
 jobs:
   build:
@@ -24,21 +28,26 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 3️⃣ Extract Docker metadata (semantic version tags)
-      - name: Extract Docker metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKER_USERNAME }}/react-app
-          tags: |
-            type=ref,name=tag   # Uses Git tags like v1.0, v1.1
-            type=raw,value=latest # Optional: always tag latest
+      # 3️⃣ Determine Docker version
+      - name: Set Docker version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION=${{ github.event.inputs.version }}
+          elif [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+          else
+            VERSION=latest
+          fi
+          echo "Docker image version: $VERSION"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      # 4️⃣ Build and Push Docker Image
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
+      # 4️⃣ Build Docker Image
+      - name: Build Docker Image
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/react-app:$VERSION .
 
+      # 5️⃣ Push Docker Image
+      - name: Push Docker Image
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/react-app:$VERSION
